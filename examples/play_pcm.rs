@@ -10,7 +10,7 @@ fn main() {
     };
 
     // player
-    let mut audio = ruby_rs::audio::Audio::new(ruby_rs::audio::AudioDriverType::WASAPI).unwrap();
+    let mut audio = ieaoo::audio::Audio::new(ieaoo::audio::AudioDriverType::WASAPI).unwrap();
 
     for sample in samples.chunks(2) {
         audio.output(&[sample[0] as f64 / 32768.0, sample[1] as f64 / 32768.0]).unwrap();
