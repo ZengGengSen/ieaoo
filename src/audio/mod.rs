@@ -1,27 +1,37 @@
 #[cfg(target_os = "windows")]
 mod wasapi;
 
-#[cfg(target_os = "windows")]
-pub use wasapi::WASAPIDriver;
+#[cfg(target_os = "linux")]
+mod alsa;
 
 pub enum AudioDriverType {
     #[cfg(target_os = "windows")]
     WASAPI,
+    #[cfg(target_os = "linux")]
+    ALSA,
     None,
 }
 
 pub enum Error {
+    NoDevice,
+    DeviceNotFound(String),
     Unsupported(String),
     #[cfg(target_os = "windows")]
     WASAPIError(wasapi::Error),
+    #[cfg(target_os = "linux")]
+    ALSAError(alsa::Error),
 }
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
        match self {
+           Error::NoDevice => write!(f, "NotDevice"),
+           Error::DeviceNotFound(device) => write!(f, "Device {} not found", device),
            Error::Unsupported(msg) => write!(f, "Unsupported: {}", msg),
            #[cfg(target_os = "windows")]
            Error::WASAPIError(err) => write!(f, "WASAPIError: {}", err),
+           #[cfg(target_os = "linux")]
+           Error::ALSAError(err) => write!(f, "ALSAError: {}", err),
        }
     }
 }
@@ -29,9 +39,13 @@ impl std::fmt::Display for Error {
 impl std::fmt::Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
        match self {
+           Error::NoDevice => write!(f, "NotDevice"),
+           Error::DeviceNotFound(device) => write!(f, "Device {} not found", device),
            Error::Unsupported(msg) => write!(f, "Unsupported: {}", msg),
            #[cfg(target_os = "windows")]
            Error::WASAPIError(err) => write!(f, "WASAPIError: {}", err),
+           #[cfg(target_os = "linux")]
+           Error::ALSAError(err) => write!(f, "ALSAError: {}", err),
        }
     }
 }
@@ -40,6 +54,13 @@ impl std::fmt::Debug for Error {
 impl From<wasapi::Error> for Error {
     fn from(err: wasapi::Error) -> Self {
         Error::WASAPIError(err)
+    }
+}
+
+#[cfg(target_os = "linux")]
+impl From<alsa::Error> for Error {
+    fn from(err: alsa::Error) -> Self {
+        Error::ALSAError(err)
     }
 }
 
@@ -121,7 +142,11 @@ impl Audio {
         match ty {
             #[cfg(target_os = "windows")]
             AudioDriverType::WASAPI => Ok(Audio {
-                instance: Box::new(WASAPIDriver::new()?),
+                instance: Box::new(wasapi::WASAPIDriver::new()?),
+            }),
+            #[cfg(target_os = "linux")]
+            AudioDriverType::ALSA => Ok(Audio {
+                instance: Box::new(alsa::ALSADriver::new()?),
             }),
             _ => Ok(Audio {
                 instance: Box::new(NullDriver),
@@ -133,6 +158,8 @@ impl Audio {
         let mut drivers = Vec::new();
         #[cfg(target_os = "windows")]
         drivers.push("WASAPI");
+        #[cfg(target_os = "linux")]
+        drivers.push("ALSA");
         drivers
     }
 

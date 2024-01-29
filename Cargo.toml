@@ -24,3 +24,6 @@ features = [
     "Win32_System_Variant",
     "Win32_UI_Shell_PropertiesSystem"
 ]
+
+[target.'cfg(target_os = "linux")'.dependencies.alsa]
+version = "0.8.1"

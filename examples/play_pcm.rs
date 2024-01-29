@@ -1,8 +1,10 @@
+#[cfg(target_os = "windows")]
 use windows::Win32::System::Com::{CoInitialize, CoUninitialize};
 
 const SAMPLE_U8: &[u8] = include_bytes!("test.pcm");
 
 fn main() {
+    #[cfg(target_os = "windows")]
     unsafe { CoInitialize(None).unwrap() };
 
     let samples = unsafe {
@@ -10,11 +12,17 @@ fn main() {
     };
 
     // player
-    let mut audio = ieaoo::audio::Audio::new(ieaoo::audio::AudioDriverType::WASAPI).unwrap();
+    let mut audio = ieaoo::audio::Audio::new(
+        #[cfg(target_os = "windows")]
+        ieaoo::audio::AudioDriverType::WASAPI,
+        #[cfg(target_os = "linux")]
+        ieaoo::audio::AudioDriverType::ALSA,
+    ).unwrap();
 
     for sample in samples.chunks(2) {
         audio.output(&[sample[0] as f64 / 32768.0, sample[1] as f64 / 32768.0]).unwrap();
     }
 
+    #[cfg(target_os = "windows")]
     unsafe { CoUninitialize() };
 }
