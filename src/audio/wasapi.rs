@@ -459,4 +459,28 @@ impl AudioDriver for WASAPIDriver {
 
         Ok(())
     }
+
+    fn output_i16(&mut self, samples: &[i16]) -> Result<(), super::Error> {
+        let samples = samples[0..self.prev.channels as usize]
+            .iter()
+            .map(|&x| x as f64 / 32768.0)
+            .collect();
+        self.prev.samples.push_back(samples);
+
+        if self.prev.samples.len() >= self.prev.buffer_size as usize {
+            if unsafe {
+                WaitForSingleObject(
+                    self.prev.event_handle,
+                    if self.blocking { INFINITE } else { 0 },
+                )
+            } == WAIT_OBJECT_0
+            {
+                self.prev.write()?;
+            } else {
+                return Err(super::Error::WASAPIError(Error::WaitTimeout));
+            }
+        }
+
+        Ok(())
+    }
 }

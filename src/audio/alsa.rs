@@ -1,6 +1,10 @@
 use std::ffi::CString;
 
-use alsa::{device_name::HintIter, PCM, Direction, pcm::{Access, Format, HwParams, Frames}, ValueOr};
+use alsa::{
+    device_name::HintIter,
+    pcm::{Access, Format, Frames, HwParams},
+    Direction, ValueOr, PCM,
+};
 
 use super::AudioDriver;
 
@@ -9,7 +13,7 @@ pub use alsa::Error;
 struct ALSADriverPrev {
     blocking: bool,
     buffer: Vec<i16>,
-    buffer_size: u64,
+    _buffer_size: u64,
     frequency: u32,
     latency: u32,
     name: String,
@@ -18,11 +22,16 @@ struct ALSADriverPrev {
 }
 
 impl ALSADriverPrev {
-    fn new(name: &str, latency: u32, frequency: u32, blocking: bool) -> Result<ALSADriverPrev, super::Error> {
+    fn new(
+        name: &str,
+        latency: u32,
+        frequency: u32,
+        blocking: bool,
+    ) -> Result<ALSADriverPrev, super::Error> {
         let pcm = PCM::new(&name, Direction::Playback, !blocking)?;
 
         let rate = frequency;
-        let buffer_time = latency * 1000;  // ms -> us
+        let buffer_time = latency * 1000; // ms -> us
         let period_time = buffer_time / 8; // ms -> us
 
         let hw_params = HwParams::any(&pcm)?;
@@ -46,7 +55,7 @@ impl ALSADriverPrev {
 
         Ok(ALSADriverPrev {
             blocking,
-            buffer_size,
+            _buffer_size: buffer_size,
             frequency,
             latency,
             buffer: Vec::with_capacity(period_size as usize * 2),
@@ -75,7 +84,7 @@ impl ALSADriverPrev {
             if available >= self.buffer.len() as Frames {
                 break;
             }
-        };
+        }
 
         let mut output = self.buffer.as_slice();
 
@@ -90,7 +99,7 @@ impl ALSADriverPrev {
                     if written * 2 <= output.len() {
                         output = &output[written as usize * 2..];
                     }
-                },
+                }
                 Err(err) => {
                     //no samples written
                     if let Err(err) = self.pcm.recover(err.errno() as i32, true) {
@@ -126,9 +135,7 @@ pub struct ALSADriver {
 impl ALSADriver {
     pub fn new() -> Result<ALSADriver, super::Error> {
         let device_names = HintIter::new(None, &CString::new("pcm").unwrap())?
-            .map(|hint| {
-                hint.name.unwrap().clone()
-            })
+            .map(|hint| hint.name.unwrap().clone())
             .collect::<Vec<_>>();
 
         if device_names.len() == 0 {
@@ -137,10 +144,7 @@ impl ALSADriver {
 
         let prev = ALSADriverPrev::new(&device_names[0], 20, 44100, false)?;
 
-        Ok(ALSADriver {
-            device_names,
-            prev,
-        })
+        Ok(ALSADriver { device_names, prev })
     }
 }
 
@@ -178,7 +182,12 @@ impl AudioDriver for ALSADriver {
             return Ok(());
         }
 
-        self.prev = ALSADriverPrev::new(device, self.prev.latency, self.prev.frequency, self.prev.blocking)?;
+        self.prev = ALSADriverPrev::new(
+            device,
+            self.prev.latency,
+            self.prev.frequency,
+            self.prev.blocking,
+        )?;
         Ok(())
     }
 
@@ -187,20 +196,33 @@ impl AudioDriver for ALSADriver {
             return Ok(());
         }
 
-        self.prev = ALSADriverPrev::new(&self.prev.name, self.prev.latency, self.prev.frequency, blocking)?;
+        self.prev = ALSADriverPrev::new(
+            &self.prev.name,
+            self.prev.latency,
+            self.prev.frequency,
+            blocking,
+        )?;
         Ok(())
     }
 
     fn set_frequency(&mut self, frequency: u32) -> Result<(), super::Error> {
         if !self.support_frequencies().contains(&frequency) {
-            return Err(super::Error::Unsupported(format!("frequency: {}", frequency)));
+            return Err(super::Error::Unsupported(format!(
+                "frequency: {}",
+                frequency
+            )));
         }
 
         if self.prev.frequency == frequency {
             return Ok(());
         }
 
-        self.prev = ALSADriverPrev::new(&self.prev.name, self.prev.latency, frequency, self.prev.blocking)?;
+        self.prev = ALSADriverPrev::new(
+            &self.prev.name,
+            self.prev.latency,
+            frequency,
+            self.prev.blocking,
+        )?;
         Ok(())
     }
 
@@ -213,7 +235,12 @@ impl AudioDriver for ALSADriver {
             return Ok(());
         }
 
-        self.prev = ALSADriverPrev::new(&self.prev.name, latency, self.prev.frequency, self.prev.blocking)?;
+        self.prev = ALSADriverPrev::new(
+            &self.prev.name,
+            latency,
+            self.prev.frequency,
+            self.prev.blocking,
+        )?;
         Ok(())
     }
 
@@ -221,7 +248,22 @@ impl AudioDriver for ALSADriver {
         self.prev.buffer.push((samples[0] * 32767.0) as i16);
         self.prev.buffer.push((samples[1] * 32767.0) as i16);
 
-        println!("{} {}", self.prev.buffer.len(), self.prev.period_size as usize * 2);
+        println!(
+            "{} {}",
+            self.prev.buffer.len(),
+            self.prev.period_size as usize * 2
+        );
+        if self.prev.buffer.len() >= self.prev.period_size as usize * 2 {
+            self.prev.write()?;
+        }
+
+        Ok(())
+    }
+
+    fn output_i16(&mut self, samples: &[i16]) -> Result<(), super::Error> {
+        self.prev.buffer.push(samples[0]);
+        self.prev.buffer.push(samples[1]);
+
         if self.prev.buffer.len() >= self.prev.period_size as usize * 2 {
             self.prev.write()?;
         }

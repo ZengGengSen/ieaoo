@@ -24,29 +24,29 @@ pub enum Error {
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-       match self {
-           Error::NoDevice => write!(f, "NotDevice"),
-           Error::DeviceNotFound(device) => write!(f, "Device {} not found", device),
-           Error::Unsupported(msg) => write!(f, "Unsupported: {}", msg),
-           #[cfg(target_os = "windows")]
-           Error::WASAPIError(err) => write!(f, "WASAPIError: {}", err),
-           #[cfg(target_os = "linux")]
-           Error::ALSAError(err) => write!(f, "ALSAError: {}", err),
-       }
+        match self {
+            Error::NoDevice => write!(f, "NotDevice"),
+            Error::DeviceNotFound(device) => write!(f, "Device {} not found", device),
+            Error::Unsupported(msg) => write!(f, "Unsupported: {}", msg),
+            #[cfg(target_os = "windows")]
+            Error::WASAPIError(err) => write!(f, "WASAPIError: {}", err),
+            #[cfg(target_os = "linux")]
+            Error::ALSAError(err) => write!(f, "ALSAError: {}", err),
+        }
     }
 }
 
 impl std::fmt::Debug for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-       match self {
-           Error::NoDevice => write!(f, "NotDevice"),
-           Error::DeviceNotFound(device) => write!(f, "Device {} not found", device),
-           Error::Unsupported(msg) => write!(f, "Unsupported: {}", msg),
-           #[cfg(target_os = "windows")]
-           Error::WASAPIError(err) => write!(f, "WASAPIError: {}", err),
-           #[cfg(target_os = "linux")]
-           Error::ALSAError(err) => write!(f, "ALSAError: {}", err),
-       }
+        match self {
+            Error::NoDevice => write!(f, "NotDevice"),
+            Error::DeviceNotFound(device) => write!(f, "Device {} not found", device),
+            Error::Unsupported(msg) => write!(f, "Unsupported: {}", msg),
+            #[cfg(target_os = "windows")]
+            Error::WASAPIError(err) => write!(f, "WASAPIError: {}", err),
+            #[cfg(target_os = "linux")]
+            Error::ALSAError(err) => write!(f, "ALSAError: {}", err),
+        }
     }
 }
 
@@ -124,6 +124,11 @@ pub trait AudioDriver {
     }
 
     fn output(&mut self, samples: &[f64]) -> Result<(), Error> {
+        let _ = samples;
+        Ok(())
+    }
+
+    fn output_i16(&mut self, samples: &[i16]) -> Result<(), Error> {
         let _ = samples;
         Ok(())
     }
@@ -257,6 +262,11 @@ impl Audio {
 
     pub fn output(&mut self, sample: &[f64]) -> Result<(), Error> {
         self.instance.output(sample)?;
+        Ok(())
+    }
+
+    pub fn output_i16(&mut self, sample: &[i16]) -> Result<(), Error> {
+        self.instance.output_i16(&sample)?;
         Ok(())
     }
 }
